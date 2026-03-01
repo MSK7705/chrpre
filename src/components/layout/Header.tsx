@@ -1,12 +1,16 @@
 import { Bell, User } from 'lucide-react';
+import { useProfile } from '../../contexts/ProfileContext';
 
 export function Header() {
+  const { profile } = useProfile();
+
+  const displayName = profile?.full_name || 'Guest';
   return (
     <header className="bg-white border-b border-gray-100 px-8 py-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Health Dashboard</h1>
-          <p className="text-sm text-gray-500">Welcome back, John Doe</p>
+          <p className="text-sm text-gray-500">Welcome back, {displayName}</p>
         </div>
 
         <div className="flex items-center space-x-4">
@@ -16,8 +20,8 @@ export function Header() {
           </button>
           <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-800">John Doe</p>
-              <p className="text-xs text-gray-500">Patient ID: 12345</p>
+              <p className="text-sm font-medium text-gray-800">{displayName}</p>
+              <p className="text-xs text-gray-500">Patient</p>
             </div>
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
               <User size={20} className="text-blue-600" />
