@@ -1,22 +1,24 @@
 import { useState } from 'react';
 import { Sidebar } from '../components/layout/Sidebar';
+import { foodItems } from '../data/food_data';
 import { Header } from '../components/layout/Header';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
-import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
-import { Coffee, Utensils, Moon, Droplet, Flame, AlertCircle } from 'lucide-react';
+import { Coffee, Utensils, Moon, Droplet, Flame, AlertCircle, Apple, X } from 'lucide-react';
 
 interface MealData {
-  breakfast: string;
-  lunch: string;
-  dinner: string;
+  breakfast: string[];
+  lunch: string[];
+  dinner: string[];
+  snacks: string[];
 }
 
 export function DailyIntake() {
   const [meals, setMeals] = useState<MealData>({
-    breakfast: '',
-    lunch: '',
-    dinner: '',
+    breakfast: [],
+    lunch: [],
+    dinner: [],
+    snacks: [],
   });
 
   const [waterGlasses, setWaterGlasses] = useState(0);
@@ -28,8 +30,18 @@ export function DailyIntake() {
   const sugar = 35;
   const maxSugar = 50;
 
-  const handleMealChange = (meal: keyof MealData) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMeals({ ...meals, [meal]: e.target.value });
+  const handleAddFood = (meal: keyof MealData) => (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedFood = e.target.value;
+    if (selectedFood) {
+      setMeals({ ...meals, [meal]: [...meals[meal], selectedFood] });
+    }
+  };
+
+  const handleRemoveFood = (meal: keyof MealData, index: number) => {
+    setMeals({
+      ...meals,
+      [meal]: meals[meal].filter((_, i) => i !== index),
+    });
   };
 
   const addWaterGlass = () => {
@@ -154,43 +166,59 @@ export function DailyIntake() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Coffee className="text-blue-600" size={20} />
-                      <h4 className="font-semibold text-gray-800">Breakfast</h4>
-                    </div>
-                    <Input
-                      placeholder="e.g., Oatmeal with fruits, 350 kcal"
-                      value={meals.breakfast}
-                      onChange={handleMealChange('breakfast')}
-                    />
-                  </div>
+                  {(['breakfast', 'lunch', 'dinner', 'snacks'] as const).map((mealType) => {
+                    const icons = {
+                      breakfast: <Coffee className="text-blue-600" size={20} />,
+                      lunch: <Utensils className="text-blue-600" size={20} />,
+                      dinner: <Moon className="text-blue-600" size={20} />,
+                      snacks: <Apple className="text-blue-600" size={20} />,
+                    };
+                    const titles = {
+                      breakfast: 'Breakfast',
+                      lunch: 'Lunch',
+                      dinner: 'Dinner',
+                      snacks: 'Snacks',
+                    };
 
-                  <div>
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Utensils className="text-blue-600" size={20} />
-                      <h4 className="font-semibold text-gray-800">Lunch</h4>
-                    </div>
-                    <Input
-                      placeholder="e.g., Grilled chicken salad, 550 kcal"
-                      value={meals.lunch}
-                      onChange={handleMealChange('lunch')}
-                    />
-                  </div>
+                    return (
+                      <div key={mealType}>
+                        <div className="flex items-center space-x-2 mb-3">
+                          {icons[mealType]}
+                          <h4 className="font-semibold text-gray-800">{titles[mealType]}</h4>
+                        </div>
+                        <select
+                          value=""
+                          onChange={handleAddFood(mealType)}
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
+                        >
+                          <option value="" disabled>Select food item to add</option>
+                          {foodItems.map((food, idx) => (
+                            <option key={idx} value={food.name}>
+                              {food.name}
+                            </option>
+                          ))}
+                        </select>
+                        {meals[mealType].length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {meals[mealType].map((food, idx) => (
+                              <span key={idx} className="bg-blue-50 text-blue-700 border border-blue-200 text-sm px-3 py-1.5 rounded-lg flex items-center shadow-sm">
+                                {food}
+                                <button
+                                  onClick={() => handleRemoveFood(mealType, idx)}
+                                  className="ml-2 text-blue-400 hover:text-blue-600 focus:outline-none bg-white rounded-full p-0.5"
+                                  title="Remove"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
 
-                  <div>
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Moon className="text-blue-600" size={20} />
-                      <h4 className="font-semibold text-gray-800">Dinner</h4>
-                    </div>
-                    <Input
-                      placeholder="e.g., Salmon with vegetables, 650 kcal"
-                      value={meals.dinner}
-                      onChange={handleMealChange('dinner')}
-                    />
-                  </div>
-
-                  <Button className="w-full">Save Meals</Button>
+                  <Button className="w-full mt-4">Save Meals</Button>
                 </div>
               </CardContent>
             </Card>
@@ -219,9 +247,8 @@ export function DailyIntake() {
                   {[...Array(8)].map((_, i) => (
                     <div
                       key={i}
-                      className={`h-12 rounded-lg transition-all duration-300 ${
-                        i < waterGlasses ? 'bg-blue-500' : 'bg-gray-200'
-                      }`}
+                      className={`h-12 rounded-lg transition-all duration-300 ${i < waterGlasses ? 'bg-blue-500' : 'bg-gray-200'
+                        }`}
                     ></div>
                   ))}
                 </div>
