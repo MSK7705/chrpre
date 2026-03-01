@@ -1,12 +1,54 @@
+import { useState, useEffect } from 'react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Header } from '../components/layout/Header';
 import { HealthScoreCard } from '../components/dashboard/HealthScoreCard';
 import { MetricCard } from '../components/dashboard/MetricCard';
 import { HeartRateChart } from '../components/dashboard/HeartRateChart';
 import { HealthScoreBarChart } from '../components/dashboard/HealthScoreBarChart';
-import { Heart, Activity, Droplet, Gauge } from 'lucide-react';
+import { Heart, Activity, Gauge, Flame } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export function Dashboard() {
+  const [dailyCalories, setDailyCalories] = useState(0);
+  const [caloriePercent, setCaloriePercent] = useState('0%');
+
+  useEffect(() => {
+    fetchCalorieData();
+  }, []);
+
+  const fetchCalorieData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const today = new Date().toISOString().split('T')[0];
+
+      // Fetch targets and intake in parallel
+      const [intakeRes, targetsRes] = await Promise.all([
+        supabase
+          .from('daily_intake')
+          .select('total_calories')
+          .eq('user_id', user.id)
+          .eq('date', today)
+          .single(),
+        supabase
+          .from('user_targets')
+          .select('target_calories')
+          .eq('user_id', user.id)
+          .single()
+      ]);
+
+      const calories = intakeRes.data?.total_calories || 0;
+      const target = targetsRes.data?.target_calories || 2000;
+
+      setDailyCalories(calories);
+      setCaloriePercent(`${Math.min(Math.round((calories / target) * 100), 100)}%`);
+
+    } catch (err) {
+      console.error('Error fetching dashboard calories:', err);
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
@@ -44,11 +86,11 @@ export function Dashboard() {
               />
               <MetricCard
                 title="Daily Calories"
-                value={1850}
+                value={dailyCalories}
                 unit="kcal"
-                icon={Droplet}
+                icon={Flame}
                 status="normal"
-                trend="75%"
+                trend={caloriePercent}
               />
             </div>
           </div>
