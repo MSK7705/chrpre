@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileUp, Activity, Apple, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, FileUp, Activity, Apple, AlertCircle, Target } from 'lucide-react';
 
 export function Sidebar() {
   const location = useLocation();
@@ -9,6 +9,7 @@ export function Sidebar() {
     { path: '/upload', icon: FileUp, label: 'Upload Reports' },
     { path: '/prediction', icon: Activity, label: 'Prediction' },
     { path: '/intake', icon: Apple, label: 'Daily Intake' },
+    { path: '/targets', icon: Target, label: 'Targets' },
     { path: '/emergency', icon: AlertCircle, label: 'Emergency Alert' },
   ];
 
@@ -28,11 +29,10 @@ export function Sidebar() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                isActive
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
+              className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-gray-600 hover:bg-gray-50'
+                }`}
             >
               <Icon size={20} />
               <span className="font-medium">{item.label}</span>

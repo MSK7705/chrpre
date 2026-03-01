@@ -26,38 +26,64 @@ export function DailyIntake() {
   const [success, setSuccess] = useState<string | null>(null);
   const [waterGlasses, setWaterGlasses] = useState(0);
 
-  const targetCalories = 2000;
-  const maxSodium = 2300;
-  const targetProtein = 50;
+  // Targets state
+  const [targets, setTargets] = useState({
+    calories: 2000,
+    sodium: 2300,
+    protein: 50,
+    water: 8
+  });
 
-  // Fetch today's data on mount
+  // Fetch today's data and user targets on mount
   useEffect(() => {
-    fetchTodayData();
+    fetchData();
   }, []);
 
-  const fetchTodayData = async () => {
+  const fetchData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('daily_intake')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      // Fetch targets and intake in parallel
+      const [intakeRes, targetsRes] = await Promise.all([
+        supabase
+          .from('daily_intake')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('date', today)
+          .single(),
+        supabase
+          .from('user_targets')
+          .select('*')
+          .eq('user_id', user.id)
+          .single()
+      ]);
+
+      if (intakeRes.error && intakeRes.error.code !== 'PGRST116') {
+        throw intakeRes.error;
       }
 
-      if (data) {
-        setMeals(data.meals);
-        setWaterGlasses(data.water_glasses);
+      if (targetsRes.error && targetsRes.error.code !== 'PGRST116') {
+        throw targetsRes.error;
+      }
+
+      if (intakeRes.data) {
+        setMeals(intakeRes.data.meals);
+        setWaterGlasses(intakeRes.data.water_glasses);
+      }
+
+      if (targetsRes.data) {
+        setTargets({
+          calories: targetsRes.data.target_calories,
+          sodium: targetsRes.data.max_sodium,
+          protein: targetsRes.data.target_protein,
+          water: targetsRes.data.target_water,
+        });
       }
     } catch (err: any) {
-      console.error('Error fetching today data:', err.message);
+      console.error('Error fetching data:', err.message);
     }
   };
 
@@ -194,16 +220,16 @@ export function DailyIntake() {
               <CardContent>
                 <div className="text-4xl font-bold text-gray-900 mb-2">
                   {totals.calories}
-                  <span className="text-lg text-gray-500"> / {targetCalories}</span>
+                  <span className="text-lg text-gray-500"> / {targets.calories}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                   <div
-                    className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(Math.min(totals.calories, targetCalories), targetCalories)}`}
-                    style={{ width: `${Math.min((totals.calories / targetCalories) * 100, 100)}%` }}
+                    className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(Math.min(totals.calories, targets.calories), targets.calories)}`}
+                    style={{ width: `${Math.min((totals.calories / targets.calories) * 100, 100)}%` }}
                   ></div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {Math.max(targetCalories - totals.calories, 0)} kcal remaining
+                  {Math.max(targets.calories - totals.calories, 0)} kcal remaining
                 </p>
               </CardContent>
             </Card>
@@ -227,12 +253,12 @@ export function DailyIntake() {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                   <div
-                    className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(totals.sodium, maxSodium)}`}
-                    style={{ width: `${Math.min((totals.sodium / maxSodium) * 100, 100)}%` }}
+                    className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(totals.sodium, targets.sodium)}`}
+                    style={{ width: `${Math.min((totals.sodium / targets.sodium) * 100, 100)}%` }}
                   ></div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {((totals.sodium / maxSodium) * 100).toFixed(0)}% of daily limit
+                  {((totals.sodium / targets.sodium) * 100).toFixed(0)}% of daily limit
                 </p>
               </CardContent>
             </Card>
@@ -257,11 +283,11 @@ export function DailyIntake() {
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                   <div
                     className="bg-green-500 h-3 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min((totals.protein / targetProtein) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((totals.protein / targets.protein) * 100, 100)}%` }}
                   ></div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {((totals.protein / targetProtein) * 100).toFixed(0)}% of daily target
+                  {((totals.protein / targets.protein) * 100).toFixed(0)}% of {targets.protein}g target
                 </p>
               </CardContent>
             </Card>
@@ -347,13 +373,13 @@ export function DailyIntake() {
                   <Droplet className="text-blue-500 mx-auto mb-4" size={64} />
                   <div className="text-5xl font-bold text-blue-600 mb-2">{waterGlasses}</div>
                   <p className="text-gray-600">Glasses of water</p>
-                  <p className="text-sm text-gray-500 mt-1">({waterGlasses * 250}ml / 2000ml)</p>
+                  <p className="text-sm text-gray-500 mt-1">({waterGlasses * 250}ml / {targets.water * 250}ml)</p>
                 </div>
 
                 <div className="w-full bg-gray-200 rounded-full h-4 mb-6">
                   <div
                     className="bg-blue-500 h-4 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min((waterGlasses / 8) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((waterGlasses / targets.water) * 100, 100)}%` }}
                   ></div>
                 </div>
 
