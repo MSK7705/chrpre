@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Sidebar } from '../components/layout/Sidebar';
 import { foodItems } from '../data/food_data';
+import { supabase } from '../lib/supabase';
 import { Header } from '../components/layout/Header';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Coffee, Utensils, Moon, Droplet, Flame, AlertCircle, Apple, X } from 'lucide-react';
+import { Coffee, Utensils, Moon, Droplet, Flame, AlertCircle, Apple, X, Beef } from 'lucide-react';
 
 interface MealData {
   breakfast: string[];
@@ -20,15 +21,111 @@ export function DailyIntake() {
     dinner: [],
     snacks: [],
   });
-
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [waterGlasses, setWaterGlasses] = useState(0);
 
-  const totalCalories = 1850;
   const targetCalories = 2000;
-  const sodium = 1200;
   const maxSodium = 2300;
-  const sugar = 35;
-  const maxSugar = 50;
+  const targetProtein = 50;
+
+  // Fetch today's data on mount
+  useEffect(() => {
+    fetchTodayData();
+  }, []);
+
+  const fetchTodayData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('daily_intake')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (data) {
+        setMeals(data.meals);
+        setWaterGlasses(data.water_glasses);
+      }
+    } catch (err: any) {
+      console.error('Error fetching today data:', err.message);
+    }
+  };
+
+  // Calculate dynamic totals from matched food items
+  const totals = useMemo(() => {
+    let cal = 0;
+    let prot = 0;
+    let sod = 0;
+
+    const allFoods = [
+      ...meals.breakfast,
+      ...meals.lunch,
+      ...meals.dinner,
+      ...meals.snacks,
+    ];
+
+    allFoods.forEach((foodName) => {
+      const food = foodItems.find((item) => item.name === foodName);
+      if (food) {
+        cal += food.calories;
+        prot += food.protein;
+        sod += food.sodium;
+      }
+    });
+
+    return { calories: Math.round(cal), protein: Math.round(prot), sodium: Math.round(sod) };
+  }, [meals]);
+
+  const handleSave = async () => {
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+
+      const { error } = await supabase
+        .from('daily_intake')
+        .upsert({
+          user_id: user.id,
+          date: today,
+          meals,
+          water_glasses: waterGlasses,
+          total_calories: totals.calories,
+          total_protein: totals.protein,
+          total_sodium: totals.sodium,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,date'
+        });
+
+      if (error) throw error;
+
+      setSuccess('Daily intake saved successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err.message);
+      console.error('Save error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAddFood = (meal: keyof MealData) => (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedFood = e.target.value;
@@ -70,6 +167,17 @@ export function DailyIntake() {
             <p className="text-gray-600">Monitor your meals, water intake, and nutrition</p>
           </div>
 
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-4 bg-green-50 text-green-600 rounded-lg">
+              {success}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <Card className="bg-gradient-to-br from-orange-50 to-white">
               <CardHeader>
@@ -85,17 +193,17 @@ export function DailyIntake() {
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold text-gray-900 mb-2">
-                  {totalCalories}
+                  {totals.calories}
                   <span className="text-lg text-gray-500"> / {targetCalories}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                   <div
-                    className="bg-orange-500 h-3 rounded-full transition-all duration-500"
-                    style={{ width: `${(totalCalories / targetCalories) * 100}%` }}
+                    className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(Math.min(totals.calories, targetCalories), targetCalories)}`}
+                    style={{ width: `${Math.min((totals.calories / targetCalories) * 100, 100)}%` }}
                   ></div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {targetCalories - totalCalories} kcal remaining
+                  {Math.max(targetCalories - totals.calories, 0)} kcal remaining
                 </p>
               </CardContent>
             </Card>
@@ -114,46 +222,46 @@ export function DailyIntake() {
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold text-gray-900 mb-2">
-                  {sodium}
+                  {totals.sodium}
                   <span className="text-lg text-gray-500"> mg</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                   <div
-                    className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(sodium, maxSodium)}`}
-                    style={{ width: `${(sodium / maxSodium) * 100}%` }}
+                    className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(totals.sodium, maxSodium)}`}
+                    style={{ width: `${Math.min((totals.sodium / maxSodium) * 100, 100)}%` }}
                   ></div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {((sodium / maxSodium) * 100).toFixed(0)}% of daily limit
+                  {((totals.sodium / maxSodium) * 100).toFixed(0)}% of daily limit
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-pink-50 to-white">
+            <Card className="bg-gradient-to-br from-green-50 to-white">
               <CardHeader>
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-pink-100 rounded-lg">
-                    <Coffee className="text-pink-600" size={24} />
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Beef className="text-green-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-800">Sugar</h3>
-                    <p className="text-sm text-gray-500">Daily limit</p>
+                    <h3 className="text-lg font-semibold text-gray-800">Protein</h3>
+                    <p className="text-sm text-gray-500">Daily Target</p>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold text-gray-900 mb-2">
-                  {sugar}
+                  {totals.protein}
                   <span className="text-lg text-gray-500"> g</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                   <div
-                    className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(sugar, maxSugar)}`}
-                    style={{ width: `${(sugar / maxSugar) * 100}%` }}
+                    className="bg-green-500 h-3 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min((totals.protein / targetProtein) * 100, 100)}%` }}
                   ></div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {((sugar / maxSugar) * 100).toFixed(0)}% of daily limit
+                  {((totals.protein / targetProtein) * 100).toFixed(0)}% of daily target
                 </p>
               </CardContent>
             </Card>
@@ -218,7 +326,13 @@ export function DailyIntake() {
                     );
                   })}
 
-                  <Button className="w-full mt-4">Save Meals</Button>
+                  <Button
+                    className="w-full mt-4"
+                    onClick={handleSave}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Saving...' : 'Save Meals'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
