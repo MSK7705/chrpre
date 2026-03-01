@@ -6,6 +6,7 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'danger' | 'success';
   className?: string;
   type?: 'button' | 'submit' | 'reset';
+  disabled?: boolean;
 }
 
 export function Button({
@@ -13,7 +14,8 @@ export function Button({
   onClick,
   variant = 'primary',
   className = '',
-  type = 'button'
+  type = 'button',
+  disabled = false
 }: ButtonProps) {
   const variants = {
     primary: 'bg-blue-500 hover:bg-blue-600 text-white',
@@ -25,8 +27,9 @@ export function Button({
   return (
     <button
       type={type}
-      onClick={onClick}
-      className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ${variants[variant]} ${className}`}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ${variants[variant]} ${className} ${disabled ? 'opacity-50 cursor-not-allowed transform-none hover:scale-100' : ''}`}
     >
       {children}
     </button>

@@ -37,10 +37,10 @@ export function LandingPage() {
             <span className="text-2xl font-bold text-gray-800">HealthAI</span>
           </div>
           <div className="flex items-center space-x-4">
-            <Button variant="secondary" onClick={() => navigate('/dashboard')}>
+            <Button variant="secondary" onClick={() => navigate('/login')}>
               Login
             </Button>
-            <Button onClick={() => navigate('/dashboard')}>
+            <Button onClick={() => navigate('/login')}>
               Register
             </Button>
           </div>

@@ -5,12 +5,14 @@ import { UploadReports } from './pages/UploadReports';
 import { EmergencyAlert } from './pages/EmergencyAlert';
 import { Prediction } from './pages/Prediction';
 import { DailyIntake } from './pages/DailyIntake';
+import { Login } from './pages/Login';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/upload" element={<UploadReports />} />
         <Route path="/emergency" element={<EmergencyAlert />} />

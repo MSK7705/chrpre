@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardContent } from '../ui/Card';
+import { Card } from '../ui/Card';
 import { TrendingUp } from 'lucide-react';
 
 interface HealthScoreCardProps {
