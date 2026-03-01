@@ -92,6 +92,7 @@ export function DailyIntake() {
     let cal = 0;
     let prot = 0;
     let sod = 0;
+    let chol = 0;
 
     const allFoods = [
       ...meals.breakfast,
@@ -103,13 +104,19 @@ export function DailyIntake() {
     allFoods.forEach((foodName) => {
       const food = foodItems.find((item) => item.name === foodName);
       if (food) {
-        cal += food.calories;
-        prot += food.protein;
-        sod += food.sodium;
+        cal += food.calories || 0;
+        prot += food.protein || 0;
+        sod += food.sodium || 0;
+        chol += food.cholesterol || 0;
       }
     });
 
-    return { calories: Math.round(cal), protein: Math.round(prot), sodium: Math.round(sod) };
+    return {
+      calories: Math.round(cal),
+      protein: Math.round(prot),
+      sodium: Math.round(sod),
+      cholesterol: Math.round(chol)
+    };
   }, [meals]);
 
   const handleSave = async () => {
@@ -136,6 +143,7 @@ export function DailyIntake() {
           total_calories: totals.calories,
           total_protein: totals.protein,
           total_sodium: totals.sodium,
+          total_cholesterol: totals.cholesterol,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'user_id,date'
