@@ -21,6 +21,7 @@ interface FieldConfig {
     label: string;
     type: 'number' | 'select';
     placeholder?: string;
+    helpText?: string;
     options?: FieldOption[];
     step?: number;
     min?: number;
@@ -88,97 +89,99 @@ const MODEL_CONFIGS: Record<ModelType, ModelConfig> = {
         title: 'Heart Disease Prediction',
         subtitle: 'Cardiovascular risk assessment using clinical heart metrics.',
         fields: [
-            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 45', min: 1, max: 120 },
-            { key: 'sex', label: 'Sex', type: 'select', options: GENDER_OPTIONS },
-            { key: 'trestbps', label: 'Resting Blood Pressure (mmHg)', type: 'number', placeholder: 'e.g., 120', min: 50, max: 250 },
-            { key: 'chol', label: 'Cholesterol (mg/dL)', type: 'number', placeholder: 'e.g., 180', min: 50, max: 700 },
+            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 45', min: 1, max: 120, helpText: 'Chronological age at assessment.' },
+            { key: 'sex', label: 'Biological Sex', type: 'select', options: GENDER_OPTIONS, helpText: 'Encoded by the model as categorical cardiovascular risk factor.' },
+            { key: 'trestbps', label: 'Resting Systolic BP, Trestbps (mmHg)', type: 'number', placeholder: 'e.g., 120', min: 70, max: 230, helpText: 'Measured at rest after at least 5 minutes seated.' },
+            { key: 'chol', label: 'Serum Total Cholesterol, Chol (mg/dL)', type: 'number', placeholder: 'e.g., 180', min: 80, max: 700, helpText: 'Fasting lipid value improves reliability.' },
             {
                 key: 'fbs',
-                label: 'Fasting Blood Sugar > 120 mg/dL',
+                label: 'Fasting Blood Sugar > 120 mg/dL (FBS)',
                 type: 'select',
+                helpText: 'Binary threshold feature used directly in model training.',
                 options: [
                     { label: 'False', value: 'False' },
                     { label: 'True', value: 'True' },
                 ],
             },
-            { key: 'thalch', label: 'Max Heart Rate (bpm)', type: 'number', placeholder: 'e.g., 150', min: 40, max: 260 },
+            { key: 'thalch', label: 'Maximum Predicted HR, Thalach (bpm)', type: 'number', placeholder: 'e.g., 150', min: 60, max: 230, helpText: 'Peak heart rate observed or clinically estimated under exertion.' },
         ],
     },
     diabetes: {
         title: 'Diabetes Prediction',
         subtitle: 'Glycemic and metabolic pattern prediction.',
         fields: [
-            { key: 'glucose', label: 'Glucose', type: 'number', placeholder: 'e.g., 130', min: 0, max: 400 },
-            { key: 'bloodPressure', label: 'Blood Pressure', type: 'number', placeholder: 'e.g., 80', min: 0, max: 220 },
-            { key: 'skinThickness', label: 'Skin Thickness', type: 'number', placeholder: 'e.g., 25', min: 0, max: 120 },
-            { key: 'insulin', label: 'Insulin', type: 'number', placeholder: 'e.g., 120', min: 0, max: 1000 },
-            { key: 'bmi', label: 'BMI', type: 'number', placeholder: 'e.g., 26.4', min: 0, max: 80, step: 0.1 },
-            { key: 'diabetesPedigreeFunction', label: 'Diabetes Pedigree Function', type: 'number', placeholder: 'e.g., 0.627', min: 0, max: 3, step: 0.001 },
-            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 45', min: 1, max: 120 },
+            { key: 'glucose', label: 'Plasma Glucose Concentration (mg/dL)', type: 'number', placeholder: 'e.g., 130', min: 40, max: 400, helpText: 'Prefer fasting or standardized OGTT measurement.' },
+            { key: 'bloodPressure', label: 'Diastolic BP (mmHg)', type: 'number', placeholder: 'e.g., 80', min: 30, max: 180, helpText: 'Model was trained with diastolic component in mmHg.' },
+            { key: 'skinThickness', label: 'Triceps Skinfold Thickness (mm)', type: 'number', placeholder: 'e.g., 25', min: 1, max: 120, helpText: 'Anthropometric adiposity marker.' },
+            { key: 'insulin', label: '2-Hour Serum Insulin (mu U/ml)', type: 'number', placeholder: 'e.g., 120', min: 1, max: 1000, helpText: 'Post-load insulin improves glucose-insulin feature interaction.' },
+            { key: 'bmi', label: 'Body Mass Index (kg/m²)', type: 'number', placeholder: 'e.g., 26.4', min: 10, max: 80, step: 0.1, helpText: 'Weight/height²; include one decimal place.' },
+            { key: 'diabetesPedigreeFunction', label: 'Diabetes Pedigree Function (DPF)', type: 'number', placeholder: 'e.g., 0.627', min: 0.05, max: 3, step: 0.001, helpText: 'Genetic predisposition score used in Pima-style datasets.' },
+            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 45', min: 1, max: 120, helpText: 'Chronological age at screening.' },
         ],
     },
     hypertension: {
         title: 'Hypertension Prediction',
         subtitle: 'Blood pressure and lifestyle risk classification.',
         fields: [
-            { key: 'Systolic_BP', label: 'Systolic BP (mmHg)', type: 'number', placeholder: 'e.g., 130', min: 70, max: 260 },
-            { key: 'Diastolic_BP', label: 'Diastolic BP (mmHg)', type: 'number', placeholder: 'e.g., 85', min: 40, max: 180 },
-            { key: 'Heart_Rate', label: 'Heart Rate (bpm)', type: 'number', placeholder: 'e.g., 78', min: 30, max: 220 },
-            { key: 'BMI', label: 'BMI', type: 'number', placeholder: 'e.g., 28.4', min: 0, max: 80, step: 0.1 },
-            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 50', min: 1, max: 120 },
-            { key: 'Gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
+            { key: 'Systolic_BP', label: 'Systolic BP (mmHg)', type: 'number', placeholder: 'e.g., 130', min: 70, max: 260, helpText: 'Upper arterial pressure during ventricular contraction.' },
+            { key: 'Diastolic_BP', label: 'Diastolic BP (mmHg)', type: 'number', placeholder: 'e.g., 85', min: 40, max: 180, helpText: 'Lower arterial pressure during relaxation phase.' },
+            { key: 'Heart_Rate', label: 'Resting Heart Rate (bpm)', type: 'number', placeholder: 'e.g., 78', min: 35, max: 220, helpText: 'Measured in resting state.' },
+            { key: 'BMI', label: 'Body Mass Index (kg/m²)', type: 'number', placeholder: 'e.g., 28.4', min: 10, max: 80, step: 0.1, helpText: 'Cardiometabolic risk surrogate.' },
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 50', min: 1, max: 120, helpText: 'Age-associated vascular stiffness risk factor.' },
+            { key: 'Gender', label: 'Biological Sex', type: 'select', options: GENDER_OPTIONS, helpText: 'Categorical feature used by model encoder.' },
         ],
     },
     ckd: {
         title: 'CKD Prediction',
         subtitle: 'Kidney function risk based on blood and clinical markers.',
         fields: [
-            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 55', min: 1, max: 120 },
-            { key: 'bp', label: 'Blood Pressure (mmHg)', type: 'number', placeholder: 'e.g., 90', min: 40, max: 250 },
-            { key: 'bgr', label: 'Blood Glucose Random', type: 'number', placeholder: 'e.g., 150', min: 20, max: 500 },
-            { key: 'bu', label: 'Blood Urea', type: 'number', placeholder: 'e.g., 40', min: 1, max: 300 },
-            { key: 'sc', label: 'Serum Creatinine', type: 'number', placeholder: 'e.g., 1.2', min: 0, max: 25, step: 0.1 },
-            { key: 'hemo', label: 'Hemoglobin', type: 'number', placeholder: 'e.g., 13.5', min: 2, max: 22, step: 0.1 },
-            { key: 'htn', label: 'Hypertension History', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 55', min: 1, max: 120, helpText: 'CKD prevalence rises with age.' },
+            { key: 'bp', label: 'Blood Pressure (mmHg)', type: 'number', placeholder: 'e.g., 90', min: 40, max: 250, helpText: 'Clinic-measured arterial pressure.' },
+            { key: 'bgr', label: 'Blood Glucose Random, BGR (mg/dL)', type: 'number', placeholder: 'e.g., 150', min: 20, max: 500, helpText: 'Random plasma glucose at collection time.' },
+            { key: 'bu', label: 'Blood Urea, BU (mg/dL)', type: 'number', placeholder: 'e.g., 40', min: 1, max: 300, helpText: 'Nitrogenous waste marker.' },
+            { key: 'sc', label: 'Serum Creatinine, SC (mg/dL)', type: 'number', placeholder: 'e.g., 1.2', min: 0.1, max: 25, step: 0.1, helpText: 'Primary renal filtration marker.' },
+            { key: 'hemo', label: 'Hemoglobin, Hemo (g/dL)', type: 'number', placeholder: 'e.g., 13.5', min: 2, max: 22, step: 0.1, helpText: 'Anemia can correlate with renal dysfunction.' },
+            { key: 'htn', label: 'HTN Comorbidity Present', type: 'select', options: YES_NO_OPTIONS, helpText: 'Hypertension status as categorical comorbidity.' },
         ],
     },
     asthma: {
         title: 'Asthma Prediction',
         subtitle: 'Respiratory symptom and exposure-based risk estimation.',
         fields: [
-            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 32', min: 1, max: 120 },
-            { key: 'Gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
-            { key: 'BMI', label: 'BMI', type: 'number', placeholder: 'e.g., 24.3', min: 0, max: 80, step: 0.1 },
-            { key: 'Smoking', label: 'Smoking', type: 'select', options: YES_NO_OPTIONS },
-            { key: 'Wheezing', label: 'Wheezing', type: 'select', options: YES_NO_OPTIONS },
-            { key: 'ShortnessOfBreath', label: 'Shortness of Breath', type: 'select', options: YES_NO_OPTIONS },
-            { key: 'Coughing', label: 'Coughing', type: 'select', options: YES_NO_OPTIONS },
-            { key: 'ExerciseInduced', label: 'Exercise Induced Symptoms', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 32', min: 1, max: 120, helpText: 'Age can alter airway hyperresponsiveness profile.' },
+            { key: 'Gender', label: 'Biological Sex', type: 'select', options: GENDER_OPTIONS, helpText: 'Categorical sex-linked prevalence pattern.' },
+            { key: 'BMI', label: 'Body Mass Index (kg/m²)', type: 'number', placeholder: 'e.g., 24.3', min: 10, max: 80, step: 0.1, helpText: 'Obesity-related airway inflammation proxy.' },
+            { key: 'Smoking', label: 'Smoking Exposure', type: 'select', options: YES_NO_OPTIONS, helpText: 'Current or prior smoke exposure.' },
+            { key: 'Wheezing', label: 'Wheezing Episodes', type: 'select', options: YES_NO_OPTIONS, helpText: 'Audible expiratory wheeze presence.' },
+            { key: 'ShortnessOfBreath', label: 'Dyspnea (Shortness of Breath)', type: 'select', options: YES_NO_OPTIONS, helpText: 'Self-reported dyspnea symptom.' },
+            { key: 'Coughing', label: 'Persistent Cough', type: 'select', options: YES_NO_OPTIONS, helpText: 'Chronic cough symptom indicator.' },
+            { key: 'ExerciseInduced', label: 'Exercise-Induced Bronchospasm', type: 'select', options: YES_NO_OPTIONS, helpText: 'Symptoms triggered by activity.' },
         ],
     },
     arthritis: {
         title: 'Arthritis Prediction',
         subtitle: 'Joint pain and mobility signal-based classification.',
         fields: [
-            { key: 'Pain_Level', label: 'Pain Level', type: 'select', options: SEVERITY_OPTIONS },
-            { key: 'Joint_Mobility', label: 'Joint Mobility', type: 'select', options: SEVERITY_OPTIONS },
-            { key: 'Stiffness', label: 'Stiffness', type: 'select', options: SEVERITY_OPTIONS },
-            { key: 'Swelling', label: 'Swelling', type: 'select', options: SEVERITY_OPTIONS },
-            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 60', min: 1, max: 120 },
-            { key: 'Gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
+            { key: 'Pain_Level', label: 'Joint Pain Intensity', type: 'select', options: SEVERITY_OPTIONS, helpText: 'Clinical severity scale for pain burden.' },
+            { key: 'Joint_Mobility', label: 'Functional Joint Mobility Impairment', type: 'select', options: SEVERITY_OPTIONS, helpText: 'Range-of-motion limitation score.' },
+            { key: 'Stiffness', label: 'Morning/Activity Stiffness', type: 'select', options: SEVERITY_OPTIONS, helpText: 'Stiffness severity indicator.' },
+            { key: 'Swelling', label: 'Articular Swelling', type: 'select', options: SEVERITY_OPTIONS, helpText: 'Observed or reported inflammatory swelling.' },
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 60', min: 1, max: 120, helpText: 'Risk increases with age-related degeneration.' },
+            { key: 'Gender', label: 'Biological Sex', type: 'select', options: GENDER_OPTIONS, helpText: 'Sex-linked prevalence variation.' },
         ],
     },
     copd: {
         title: 'COPD Prediction',
         subtitle: 'Pulmonary function and respiratory burden estimation.',
         fields: [
-            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 58', min: 1, max: 120 },
-            { key: 'Oxygen_Level', label: 'Blood Oxygen Saturation (%)', type: 'number', placeholder: 'e.g., 95', min: 50, max: 100, step: 0.1 },
-            { key: 'Gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 58', min: 1, max: 120, helpText: 'Age-related lung function decline factor.' },
+            { key: 'Oxygen_Level', label: 'SpO2, Blood Oxygen Saturation (%)', type: 'number', placeholder: 'e.g., 95', min: 50, max: 100, step: 0.1, helpText: 'Pulse oximetry saturation value.' },
+            { key: 'Gender', label: 'Biological Sex', type: 'select', options: GENDER_OPTIONS, helpText: 'Categorical demographic covariate.' },
             {
                 key: 'Smoking_History',
                 label: 'Smoking History',
                 type: 'select',
+                helpText: 'Long-term tobacco exposure risk tier.',
                 options: [
                     { label: 'Never smoked', value: 'Never smoked' },
                     { label: 'Used to smoke', value: 'Used to smoke' },
@@ -186,24 +189,24 @@ const MODEL_CONFIGS: Record<ModelType, ModelConfig> = {
                     { label: 'Heavy smoker', value: 'Heavy smoker' },
                 ],
             },
-            { key: 'Cough', label: 'Cough Severity', type: 'select', options: SEVERITY_OPTIONS },
-            { key: 'Shortness_of_Breath', label: 'Shortness of Breath', type: 'select', options: SEVERITY_OPTIONS },
-            { key: 'Fatigue', label: 'Fatigue', type: 'select', options: SEVERITY_OPTIONS },
+            { key: 'Cough', label: 'Chronic Cough Severity', type: 'select', options: SEVERITY_OPTIONS, helpText: 'Symptom burden scale.' },
+            { key: 'Shortness_of_Breath', label: 'Dyspnea Severity', type: 'select', options: SEVERITY_OPTIONS, helpText: 'Breathlessness intensity scale.' },
+            { key: 'Fatigue', label: 'Fatigue Burden', type: 'select', options: SEVERITY_OPTIONS, helpText: 'Systemic symptom burden scale.' },
         ],
     },
     liver: {
         title: 'Liver Disease Prediction',
         subtitle: 'Liver enzyme and symptom profile risk prediction.',
         fields: [
-            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 47', min: 1, max: 120 },
-            { key: 'BMI', label: 'BMI', type: 'number', placeholder: 'e.g., 26.8', min: 0, max: 80, step: 0.1 },
-            { key: 'ALT', label: 'ALT', type: 'number', placeholder: 'e.g., 42', min: 0, max: 1000 },
-            { key: 'AST', label: 'AST', type: 'number', placeholder: 'e.g., 35', min: 0, max: 1000 },
-            { key: 'Bilirubin', label: 'Bilirubin', type: 'number', placeholder: 'e.g., 1.1', min: 0, max: 50, step: 0.1 },
-            { key: 'Fatigue', label: 'Fatigue', type: 'select', options: YES_NO_OPTIONS },
-            { key: 'Jaundice', label: 'Jaundice', type: 'select', options: YES_NO_OPTIONS },
-            { key: 'Nausea', label: 'Nausea', type: 'select', options: YES_NO_OPTIONS },
-            { key: 'Abdominal_Pain', label: 'Abdominal Pain', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 47', min: 1, max: 120, helpText: 'Age-linked hepatic risk progression.' },
+            { key: 'BMI', label: 'Body Mass Index (kg/m²)', type: 'number', placeholder: 'e.g., 26.8', min: 10, max: 80, step: 0.1, helpText: 'Metabolic liver risk contributor.' },
+            { key: 'ALT', label: 'Alanine Transaminase, ALT (U/L)', type: 'number', placeholder: 'e.g., 42', min: 1, max: 1000, helpText: 'Hepatocellular injury enzyme marker.' },
+            { key: 'AST', label: 'Aspartate Transaminase, AST (U/L)', type: 'number', placeholder: 'e.g., 35', min: 1, max: 1000, helpText: 'Liver and tissue injury enzyme marker.' },
+            { key: 'Bilirubin', label: 'Total Bilirubin (mg/dL)', type: 'number', placeholder: 'e.g., 1.1', min: 0.1, max: 50, step: 0.1, helpText: 'Bile metabolism marker.' },
+            { key: 'Fatigue', label: 'Fatigue Symptom', type: 'select', options: YES_NO_OPTIONS, helpText: 'Constitutional symptom status.' },
+            { key: 'Jaundice', label: 'Clinical Jaundice', type: 'select', options: YES_NO_OPTIONS, helpText: 'Visible hyperbilirubinemia sign.' },
+            { key: 'Nausea', label: 'Nausea Symptom', type: 'select', options: YES_NO_OPTIONS, helpText: 'GI symptom status.' },
+            { key: 'Abdominal_Pain', label: 'Right Upper Quadrant/Abdominal Pain', type: 'select', options: YES_NO_OPTIONS, helpText: 'Hepatobiliary pain symptom status.' },
         ],
     },
 };
@@ -415,6 +418,28 @@ export function Prediction() {
         });
     };
 
+    const getOutOfRangeFields = () => {
+        return MODEL_CONFIGS[selectedModel].fields.filter((field) => {
+            if (field.type !== 'number') {
+                return false;
+            }
+
+            const raw = formData[field.key];
+            if (raw === '' || raw === null || raw === undefined) {
+                return false;
+            }
+
+            const numeric = Number(raw);
+            if (Number.isNaN(numeric)) {
+                return true;
+            }
+
+            const belowMin = typeof field.min === 'number' && numeric < field.min;
+            const aboveMax = typeof field.max === 'number' && numeric > field.max;
+            return belowMin || aboveMax;
+        });
+    };
+
     const saveBaseMetrics = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -448,6 +473,12 @@ export function Prediction() {
         const missingFields = getMissingFields();
         if (missingFields.length > 0) {
             setErrorMessage(`Please fill all required fields before prediction. Missing: ${missingFields.map((field) => field.label).join(', ')}`);
+            return;
+        }
+
+        const outOfRangeFields = getOutOfRangeFields();
+        if (outOfRangeFields.length > 0) {
+            setErrorMessage(`Some values are outside supported clinical ranges. Please review: ${outOfRangeFields.map((field) => field.label).join(', ')}`);
             return;
         }
 
@@ -596,6 +627,10 @@ export function Prediction() {
                                                     placeholder={field.placeholder}
                                                     value={formData[field.key]}
                                                     onChange={handleChange(field.key, 'number')}
+                                                    min={field.min}
+                                                    max={field.max}
+                                                    step={field.step}
+                                                    helpText={field.helpText}
                                                 />
                                             );
                                         }
@@ -612,6 +647,9 @@ export function Prediction() {
                                                         <option key={`${field.key}-${option.value}`} value={option.value}>{option.label}</option>
                                                     ))}
                                                 </select>
+                                                {field.helpText && (
+                                                    <p className="mt-1 text-xs text-gray-500">{field.helpText}</p>
+                                                )}
                                             </div>
                                         );
                                     })}
