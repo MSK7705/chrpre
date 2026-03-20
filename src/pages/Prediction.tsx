@@ -7,25 +7,327 @@ import { Button } from '../components/ui/Button';
 import { Activity, AlertTriangle, CheckCircle, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-interface PredictionData {
-    age: number;
-    sex: number; // 0 = female, 1 = male
-    resting_bp: number;
-    cholesterol: number;
-    fasting_blood_sugar: number; // 0 or 1
-    max_heart_rate: number;
-    exercise_angina: number; // 0 or 1
-    bmi: number;
+type ModelType = 'heart' | 'diabetes' | 'hypertension' | 'ckd' | 'asthma' | 'arthritis' | 'copd' | 'liver';
+type RiskLevel = 'low' | 'moderate' | 'high';
+type FormValue = string | number;
+
+interface FieldOption {
+    label: string;
+    value: string;
+}
+
+interface FieldConfig {
+    key: string;
+    label: string;
+    type: 'number' | 'select';
+    placeholder?: string;
+    options?: FieldOption[];
+    step?: number;
+    min?: number;
+    max?: number;
+}
+
+interface ModelConfig {
+    title: string;
+    subtitle: string;
+    fields: FieldConfig[];
 }
 
 interface RiskResult {
     percentage: number;
-    level: 'low' | 'high';
+    confidence: number;
+    level: RiskLevel;
     explanation: string;
+    prediction: number;
+    modelLabel: string;
+}
+
+interface AutomatedMetrics {
+    age: number;
+    sex: number;
+    resting_bp: number;
+    cholesterol: number;
+    fasting_blood_sugar: number;
+    max_heart_rate: number;
+    exercise_angina: number;
+    bmi: number;
+}
+
+const ML_API_BASE_URL = import.meta.env.VITE_ML_API_URL || 'http://localhost:8000';
+
+const MODEL_OPTIONS: Array<{ value: ModelType; label: string }> = [
+    { value: 'heart', label: 'Heart Disease' },
+    { value: 'diabetes', label: 'Diabetes' },
+    { value: 'hypertension', label: 'Hypertension' },
+    { value: 'ckd', label: 'Chronic Kidney Disease (CKD)' },
+    { value: 'asthma', label: 'Asthma' },
+    { value: 'arthritis', label: 'Arthritis' },
+    { value: 'copd', label: 'COPD' },
+    { value: 'liver', label: 'Liver Disease' },
+];
+
+const YES_NO_OPTIONS: FieldOption[] = [
+    { label: 'No', value: 'No' },
+    { label: 'Yes', value: 'Yes' },
+];
+
+const GENDER_OPTIONS: FieldOption[] = [
+    { label: 'Female', value: 'Female' },
+    { label: 'Male', value: 'Male' },
+];
+
+const SEVERITY_OPTIONS: FieldOption[] = [
+    { label: 'No', value: 'No' },
+    { label: 'Mild', value: 'Mild' },
+    { label: 'Moderate', value: 'Moderate' },
+    { label: 'Severe', value: 'Severe' },
+];
+
+const MODEL_CONFIGS: Record<ModelType, ModelConfig> = {
+    heart: {
+        title: 'Heart Disease Prediction',
+        subtitle: 'Cardiovascular risk assessment using clinical heart metrics.',
+        fields: [
+            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 45', min: 1, max: 120 },
+            { key: 'sex', label: 'Sex', type: 'select', options: GENDER_OPTIONS },
+            { key: 'trestbps', label: 'Resting Blood Pressure (mmHg)', type: 'number', placeholder: 'e.g., 120', min: 50, max: 250 },
+            { key: 'chol', label: 'Cholesterol (mg/dL)', type: 'number', placeholder: 'e.g., 180', min: 50, max: 700 },
+            {
+                key: 'fbs',
+                label: 'Fasting Blood Sugar > 120 mg/dL',
+                type: 'select',
+                options: [
+                    { label: 'False', value: 'False' },
+                    { label: 'True', value: 'True' },
+                ],
+            },
+            { key: 'thalch', label: 'Max Heart Rate (bpm)', type: 'number', placeholder: 'e.g., 150', min: 40, max: 260 },
+        ],
+    },
+    diabetes: {
+        title: 'Diabetes Prediction',
+        subtitle: 'Glycemic and metabolic pattern prediction.',
+        fields: [
+            { key: 'glucose', label: 'Glucose', type: 'number', placeholder: 'e.g., 130', min: 0, max: 400 },
+            { key: 'bloodPressure', label: 'Blood Pressure', type: 'number', placeholder: 'e.g., 80', min: 0, max: 220 },
+            { key: 'skinThickness', label: 'Skin Thickness', type: 'number', placeholder: 'e.g., 25', min: 0, max: 120 },
+            { key: 'insulin', label: 'Insulin', type: 'number', placeholder: 'e.g., 120', min: 0, max: 1000 },
+            { key: 'bmi', label: 'BMI', type: 'number', placeholder: 'e.g., 26.4', min: 0, max: 80, step: 0.1 },
+            { key: 'diabetesPedigreeFunction', label: 'Diabetes Pedigree Function', type: 'number', placeholder: 'e.g., 0.627', min: 0, max: 3, step: 0.001 },
+            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 45', min: 1, max: 120 },
+        ],
+    },
+    hypertension: {
+        title: 'Hypertension Prediction',
+        subtitle: 'Blood pressure and lifestyle risk classification.',
+        fields: [
+            { key: 'Systolic_BP', label: 'Systolic BP (mmHg)', type: 'number', placeholder: 'e.g., 130', min: 70, max: 260 },
+            { key: 'Diastolic_BP', label: 'Diastolic BP (mmHg)', type: 'number', placeholder: 'e.g., 85', min: 40, max: 180 },
+            { key: 'Heart_Rate', label: 'Heart Rate (bpm)', type: 'number', placeholder: 'e.g., 78', min: 30, max: 220 },
+            { key: 'BMI', label: 'BMI', type: 'number', placeholder: 'e.g., 28.4', min: 0, max: 80, step: 0.1 },
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 50', min: 1, max: 120 },
+            { key: 'Gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
+        ],
+    },
+    ckd: {
+        title: 'CKD Prediction',
+        subtitle: 'Kidney function risk based on blood and clinical markers.',
+        fields: [
+            { key: 'age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 55', min: 1, max: 120 },
+            { key: 'bp', label: 'Blood Pressure (mmHg)', type: 'number', placeholder: 'e.g., 90', min: 40, max: 250 },
+            { key: 'bgr', label: 'Blood Glucose Random', type: 'number', placeholder: 'e.g., 150', min: 20, max: 500 },
+            { key: 'bu', label: 'Blood Urea', type: 'number', placeholder: 'e.g., 40', min: 1, max: 300 },
+            { key: 'sc', label: 'Serum Creatinine', type: 'number', placeholder: 'e.g., 1.2', min: 0, max: 25, step: 0.1 },
+            { key: 'hemo', label: 'Hemoglobin', type: 'number', placeholder: 'e.g., 13.5', min: 2, max: 22, step: 0.1 },
+            { key: 'htn', label: 'Hypertension History', type: 'select', options: YES_NO_OPTIONS },
+        ],
+    },
+    asthma: {
+        title: 'Asthma Prediction',
+        subtitle: 'Respiratory symptom and exposure-based risk estimation.',
+        fields: [
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 32', min: 1, max: 120 },
+            { key: 'Gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
+            { key: 'BMI', label: 'BMI', type: 'number', placeholder: 'e.g., 24.3', min: 0, max: 80, step: 0.1 },
+            { key: 'Smoking', label: 'Smoking', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'Wheezing', label: 'Wheezing', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'ShortnessOfBreath', label: 'Shortness of Breath', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'Coughing', label: 'Coughing', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'ExerciseInduced', label: 'Exercise Induced Symptoms', type: 'select', options: YES_NO_OPTIONS },
+        ],
+    },
+    arthritis: {
+        title: 'Arthritis Prediction',
+        subtitle: 'Joint pain and mobility signal-based classification.',
+        fields: [
+            { key: 'Pain_Level', label: 'Pain Level', type: 'select', options: SEVERITY_OPTIONS },
+            { key: 'Joint_Mobility', label: 'Joint Mobility', type: 'select', options: SEVERITY_OPTIONS },
+            { key: 'Stiffness', label: 'Stiffness', type: 'select', options: SEVERITY_OPTIONS },
+            { key: 'Swelling', label: 'Swelling', type: 'select', options: SEVERITY_OPTIONS },
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 60', min: 1, max: 120 },
+            { key: 'Gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
+        ],
+    },
+    copd: {
+        title: 'COPD Prediction',
+        subtitle: 'Pulmonary function and respiratory burden estimation.',
+        fields: [
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 58', min: 1, max: 120 },
+            { key: 'Oxygen_Level', label: 'Blood Oxygen Saturation (%)', type: 'number', placeholder: 'e.g., 95', min: 50, max: 100, step: 0.1 },
+            { key: 'Gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
+            {
+                key: 'Smoking_History',
+                label: 'Smoking History',
+                type: 'select',
+                options: [
+                    { label: 'Never smoked', value: 'Never smoked' },
+                    { label: 'Used to smoke', value: 'Used to smoke' },
+                    { label: 'Light smoker', value: 'Light smoker' },
+                    { label: 'Heavy smoker', value: 'Heavy smoker' },
+                ],
+            },
+            { key: 'Cough', label: 'Cough Severity', type: 'select', options: SEVERITY_OPTIONS },
+            { key: 'Shortness_of_Breath', label: 'Shortness of Breath', type: 'select', options: SEVERITY_OPTIONS },
+            { key: 'Fatigue', label: 'Fatigue', type: 'select', options: SEVERITY_OPTIONS },
+        ],
+    },
+    liver: {
+        title: 'Liver Disease Prediction',
+        subtitle: 'Liver enzyme and symptom profile risk prediction.',
+        fields: [
+            { key: 'Age', label: 'Age (years)', type: 'number', placeholder: 'e.g., 47', min: 1, max: 120 },
+            { key: 'BMI', label: 'BMI', type: 'number', placeholder: 'e.g., 26.8', min: 0, max: 80, step: 0.1 },
+            { key: 'ALT', label: 'ALT', type: 'number', placeholder: 'e.g., 42', min: 0, max: 1000 },
+            { key: 'AST', label: 'AST', type: 'number', placeholder: 'e.g., 35', min: 0, max: 1000 },
+            { key: 'Bilirubin', label: 'Bilirubin', type: 'number', placeholder: 'e.g., 1.1', min: 0, max: 50, step: 0.1 },
+            { key: 'Fatigue', label: 'Fatigue', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'Jaundice', label: 'Jaundice', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'Nausea', label: 'Nausea', type: 'select', options: YES_NO_OPTIONS },
+            { key: 'Abdominal_Pain', label: 'Abdominal Pain', type: 'select', options: YES_NO_OPTIONS },
+        ],
+    },
+};
+
+const COPD_SEVERITY_TO_SCORE: Record<string, number> = {
+    No: 0,
+    Mild: 1,
+    Moderate: 2,
+    Severe: 3,
+};
+
+function getRiskLevel(probabilityPercent: number): RiskLevel {
+    if (probabilityPercent >= 70) {
+        return 'high';
+    }
+    if (probabilityPercent >= 40) {
+        return 'moderate';
+    }
+    return 'low';
+}
+
+function getModelLabel(model: ModelType): string {
+    const found = MODEL_OPTIONS.find((item) => item.value === model);
+    return found ? found.label : model;
+}
+
+function toPercent(value: number): number {
+    if (value <= 1) {
+        return value * 100;
+    }
+    return value;
+}
+
+function getDefaultFormData(model: ModelType): Record<string, FormValue> {
+    const defaults: Record<string, FormValue> = {};
+    MODEL_CONFIGS[model].fields.forEach((field) => {
+        if (field.type === 'select') {
+            defaults[field.key] = field.options?.[0]?.value ?? '';
+        } else {
+            defaults[field.key] = '';
+        }
+    });
+    return defaults;
+}
+
+function buildPrefillByModel(model: ModelType, automated: AutomatedMetrics): Record<string, FormValue> {
+    switch (model) {
+        case 'heart':
+            return {
+                age: automated.age || '',
+                sex: automated.sex === 1 ? 'Male' : 'Female',
+                trestbps: automated.resting_bp || '',
+                chol: automated.cholesterol || '',
+                fbs: automated.fasting_blood_sugar === 1 ? 'True' : 'False',
+                thalch: automated.max_heart_rate || '',
+            };
+        case 'diabetes':
+            return {
+                age: automated.age || '',
+                bmi: automated.bmi || '',
+                bloodPressure: automated.resting_bp || '',
+            };
+        case 'hypertension':
+            return {
+                Age: automated.age || '',
+                Gender: automated.sex === 1 ? 'Male' : 'Female',
+                Systolic_BP: automated.resting_bp || '',
+                Heart_Rate: automated.max_heart_rate || '',
+                BMI: automated.bmi || '',
+            };
+        case 'ckd':
+            return {
+                age: automated.age || '',
+                bp: automated.resting_bp || '',
+                htn: automated.fasting_blood_sugar === 1 ? 'Yes' : 'No',
+            };
+        case 'asthma':
+            return {
+                Age: automated.age || '',
+                Gender: automated.sex === 1 ? 'Male' : 'Female',
+                BMI: automated.bmi || '',
+            };
+        case 'arthritis':
+            return {
+                Age: automated.age || '',
+                Gender: automated.sex === 1 ? 'Male' : 'Female',
+            };
+        case 'copd':
+            return {
+                Age: automated.age || '',
+                Gender: automated.sex === 1 ? 'Male' : 'Female',
+            };
+        case 'liver':
+            return {
+                Age: automated.age || '',
+                BMI: automated.bmi || '',
+            };
+        default:
+            return {};
+    }
+}
+
+function buildFeaturesPayload(model: ModelType, formData: Record<string, FormValue>): Record<string, FormValue> {
+    if (model !== 'copd') {
+        return formData;
+    }
+
+    const oxygenLevel = Number(formData.Oxygen_Level || 0);
+    const coughValue = COPD_SEVERITY_TO_SCORE[String(formData.Cough || 'No')] ?? 0;
+    const sobValue = COPD_SEVERITY_TO_SCORE[String(formData.Shortness_of_Breath || 'No')] ?? 0;
+    const fatigueValue = COPD_SEVERITY_TO_SCORE[String(formData.Fatigue || 'No')] ?? 0;
+
+    return {
+        ...formData,
+        Oxygen_Low: oxygenLevel < 92 ? 1 : 0,
+        Cough_SOB: coughValue * sobValue,
+        Cough_Fatigue: coughValue * fatigueValue,
+    };
 }
 
 export function Prediction() {
-    const [formData, setFormData] = useState<PredictionData>({
+    const [selectedModel, setSelectedModel] = useState<ModelType>('heart');
+    const [formData, setFormData] = useState<Record<string, FormValue>>(getDefaultFormData('heart'));
+    const [automatedMetrics, setAutomatedMetrics] = useState<AutomatedMetrics>({
         age: 0,
         sex: 0,
         resting_bp: 0,
@@ -39,10 +341,19 @@ export function Prediction() {
     const [result, setResult] = useState<RiskResult | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState<string>('');
 
     useEffect(() => {
-        fetchAutomatedMetrics();
+        void fetchAutomatedMetrics();
     }, []);
+
+    useEffect(() => {
+        const defaults = getDefaultFormData(selectedModel);
+        const prefill = buildPrefillByModel(selectedModel, automatedMetrics);
+        setFormData({ ...defaults, ...prefill });
+        setResult(null);
+        setErrorMessage('');
+    }, [selectedModel, automatedMetrics]);
 
     const calculateAge = (dobString: string) => {
         if (!dobString) return 0;
@@ -71,7 +382,7 @@ export function Prediction() {
 
             const existingMetrics = metricsRes.data || {};
 
-            setFormData({
+            const mergedMetrics: AutomatedMetrics = {
                 age: fetchedAge || existingMetrics.age || 0,
                 cholesterol: fetchedCholesterol || existingMetrics.cholesterol || 0,
                 sex: existingMetrics.sex || 0,
@@ -80,7 +391,9 @@ export function Prediction() {
                 max_heart_rate: existingMetrics.max_heart_rate || 0,
                 exercise_angina: existingMetrics.exercise_angina || 0,
                 bmi: existingMetrics.bmi || 0,
-            });
+            };
+
+            setAutomatedMetrics(mergedMetrics);
 
         } catch (err) {
             console.error('Exception fetching metrics:', err);
@@ -89,57 +402,127 @@ export function Prediction() {
         }
     };
 
-    const handleChange = (field: keyof PredictionData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData({ ...formData, [field]: Number(e.target.value) });
+    const handleChange = (field: string, type: 'number' | 'select') => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const rawValue = e.target.value;
+        const parsedValue = type === 'number' ? (rawValue === '' ? '' : Number(rawValue)) : rawValue;
+        setFormData((prev) => ({ ...prev, [field]: parsedValue }));
+    };
+
+    const getMissingFields = () => {
+        return MODEL_CONFIGS[selectedModel].fields.filter((field) => {
+            const value = formData[field.key];
+            return value === '' || value === null || value === undefined;
+        });
+    };
+
+    const saveBaseMetrics = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                return;
+            }
+
+            const sexRaw = String(formData.sex || formData.Gender || (automatedMetrics.sex === 1 ? 'Male' : 'Female')).toLowerCase();
+            const sexBinary = sexRaw === 'male' || sexRaw === 'm' || sexRaw === '1' ? 1 : 0;
+
+            const row = {
+                user_id: user.id,
+                age: Number(formData.age || formData.Age || automatedMetrics.age || 0),
+                sex: sexBinary,
+                resting_bp: Number(formData.trestbps || formData.bp || formData.Systolic_BP || automatedMetrics.resting_bp || 0),
+                cholesterol: Number(formData.chol || automatedMetrics.cholesterol || 0),
+                fasting_blood_sugar: String(formData.fbs || automatedMetrics.fasting_blood_sugar || 'False').toLowerCase().includes('true') ? 1 : 0,
+                max_heart_rate: Number(formData.thalch || formData.Heart_Rate || automatedMetrics.max_heart_rate || 0),
+                exercise_angina: automatedMetrics.exercise_angina || 0,
+                bmi: Number(formData.bmi || formData.BMI || automatedMetrics.bmi || 0),
+                updated_at: new Date().toISOString(),
+            };
+
+            await supabase.from('health_metrics').upsert(row);
+        } catch (err) {
+            console.error('Failed to save metrics:', err);
+        }
     };
 
     const calculateRisk = async () => {
-        setIsSaving(true);
-
-        // 1. Save all metrics to health_metrics table
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                await supabase
-                    .from('health_metrics')
-                    .upsert({
-                        user_id: user.id,
-                        ...formData,
-                        updated_at: new Date().toISOString()
-                    });
-            }
-        } catch (err) {
-            console.error("Failed to save metrics:", err);
+        const missingFields = getMissingFields();
+        if (missingFields.length > 0) {
+            setErrorMessage(`Please fill all required fields before prediction. Missing: ${missingFields.map((field) => field.label).join(', ')}`);
+            return;
         }
 
-        // 2. Predict Risk (Python Model Implementation)
-        // The exact condition from the Python RandomForest dataset generator:
-        // heart_disease = 1 if ((age > 50 & cholesterol > 240 & resting_bp > 140) | exercise_angina == 1) else 0
+        setErrorMessage('');
+        setIsSaving(true);
 
-        const isHighRisk =
-            (formData.age > 50 && formData.cholesterol > 240 && formData.resting_bp > 140) ||
-            (formData.exercise_angina === 1);
+        try {
+            await saveBaseMetrics();
 
-        const finalPercent = isHighRisk ? (85 + Math.floor(Math.random() * 10)) : (5 + Math.floor(Math.random() * 10));
+            const features = buildFeaturesPayload(selectedModel, formData);
 
-        let level: 'low' | 'high' = isHighRisk ? 'high' : 'low';
-        let explanation = isHighRisk
-            ? 'Your health metrics strongly map to the model\'s disease indicators (driven by age > 50 combined with high cholesterol & BP, or Exercise Angina). We strongly recommend immediate consultation with a healthcare professional.'
-            : 'Your health metrics indicate a low risk profile corresponding to the Random Forest model predictions. The model classifies this pattern as healthy.';
+            const response = await fetch(`${ML_API_BASE_URL}/predict/disease/${selectedModel}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ features }),
+            });
 
-        setResult({
-            percentage: finalPercent,
-            level,
-            explanation,
-        });
+            if (!response.ok) {
+                let detail = 'Prediction request failed.';
+                try {
+                    const errBody = (await response.json()) as { detail?: string };
+                    if (errBody?.detail) {
+                        detail = errBody.detail;
+                    }
+                } catch {
+                    // No-op: keep generic error message.
+                }
+                throw new Error(detail);
+            }
 
-        setIsSaving(false);
+            const data = (await response.json()) as {
+                risk_probability: number;
+                prediction: number;
+                confidence: number;
+            };
+
+            const probabilityPercent = Math.max(0, Math.min(100, toPercent(data.risk_probability)));
+            const confidencePercent = Math.max(0, Math.min(100, toPercent(data.confidence)));
+            const level = getRiskLevel(probabilityPercent);
+
+            const explanation =
+                data.prediction === 1
+                    ? `The ${getModelLabel(selectedModel)} model indicates a positive disease-risk signal for the provided health metrics. Please consult a healthcare professional for confirmatory diagnosis and clinical interpretation.`
+                    : `The ${getModelLabel(selectedModel)} model indicates a lower disease-risk pattern for the provided health metrics. Maintain preventive lifestyle habits and continue regular medical checkups.`;
+
+            setResult({
+                percentage: probabilityPercent,
+                confidence: confidencePercent,
+                level,
+                explanation,
+                prediction: data.prediction,
+                modelLabel: getModelLabel(selectedModel),
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unable to calculate risk right now.';
+            const normalized = message.toLowerCase();
+            const isNetworkFailure = normalized.includes('failed to fetch') || normalized.includes('networkerror') || normalized.includes('network request failed');
+            setErrorMessage(message);
+            if (isNetworkFailure) {
+                setErrorMessage('Unable to reach ML backend. Start the ML API server at http://localhost:8000 and try again.');
+            }
+            setResult(null);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const getRiskColor = (level: string) => {
         switch (level) {
             case 'low':
                 return 'text-green-600 bg-green-50 border-green-500';
+            case 'moderate':
+                return 'text-amber-600 bg-amber-50 border-amber-500';
             case 'high':
                 return 'text-red-600 bg-red-50 border-red-500';
             default:
@@ -151,6 +534,8 @@ export function Prediction() {
         switch (level) {
             case 'low':
                 return <CheckCircle size={48} />;
+            case 'moderate':
+                return <Activity size={48} />;
             case 'high':
                 return <AlertTriangle size={48} />;
             default:
@@ -174,99 +559,73 @@ export function Prediction() {
                 <main className="p-8">
                     <div className="mb-8 flex justify-between items-center">
                         <div>
-                            <h2 className="text-3xl font-bold text-gray-800 mb-2">AI Heart Disease Prediction</h2>
-                            <p className="text-gray-600">Testing Synthetic Random Forest Logic - Manual Entry Mode</p>
+                            <h2 className="text-3xl font-bold text-gray-800 mb-2">AI Multi-Disease Prediction</h2>
+                            <p className="text-gray-600">Choose a model, provide health metrics, and get ML-backed risk prediction with confidence.</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <Card>
                             <CardHeader>
-                                <h3 className="text-lg font-semibold text-gray-800">Health Metrics Input</h3>
-                                <p className="text-sm text-gray-500">Edit the fields (pre-filled with database matches) and click calculate.</p>
+                                <h3 className="text-lg font-semibold text-gray-800">Model and Health Metrics Input</h3>
+                                <p className="text-sm text-gray-500">Metrics are pre-filled where possible from your profile and saved records.</p>
                             </CardHeader>
                             <CardContent>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Input
-                                        label="Age (years)"
-                                        type="number"
-                                        placeholder="Enter your age"
-                                        value={formData.age === 0 ? '' : formData.age}
-                                        onChange={handleChange('age')}
-                                    />
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Sex</label>
-                                        <select
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                            value={formData.sex}
-                                            onChange={handleChange('sex')}
-                                        >
-                                            <option value={0}>Female</option>
-                                            <option value={1}>Male</option>
-                                        </select>
-                                    </div>
-
-                                    <Input
-                                        label="Current Resting BP (mmHg)"
-                                        type="number"
-                                        placeholder="e.g., 120"
-                                        value={formData.resting_bp === 0 ? '' : formData.resting_bp}
-                                        onChange={handleChange('resting_bp')}
-                                    />
-
-                                    <Input
-                                        label="Cholesterol (mg/dL)"
-                                        type="number"
-                                        placeholder="e.g., 180 (Fetched from meals)"
-                                        value={formData.cholesterol === 0 ? '' : formData.cholesterol}
-                                        onChange={handleChange('cholesterol')}
-                                    />
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Fasting Blood Sugar &gt; 120 mg/dl</label>
-                                        <select
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                            value={formData.fasting_blood_sugar}
-                                            onChange={handleChange('fasting_blood_sugar')}
-                                        >
-                                            <option value={0}>False</option>
-                                            <option value={1}>True</option>
-                                        </select>
-                                    </div>
-
-                                    <Input
-                                        label="Max Heart Rate (bpm)"
-                                        type="number"
-                                        placeholder="e.g., 150"
-                                        value={formData.max_heart_rate === 0 ? '' : formData.max_heart_rate}
-                                        onChange={handleChange('max_heart_rate')}
-                                    />
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Exercise Induced Angina</label>
-                                        <select
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                            value={formData.exercise_angina}
-                                            onChange={handleChange('exercise_angina')}
-                                        >
-                                            <option value={0}>No</option>
-                                            <option value={1}>Yes</option>
-                                        </select>
-                                    </div>
-
-                                    <Input
-                                        label="BMI"
-                                        type="number"
-                                        placeholder="e.g., 22.5"
-                                        value={formData.bmi === 0 ? '' : formData.bmi}
-                                        onChange={handleChange('bmi')}
-                                    />
+                                <div className="mb-5">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Disease Model</label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                        value={selectedModel}
+                                        onChange={(e) => setSelectedModel(e.target.value as ModelType)}
+                                    >
+                                        {MODEL_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-2">{MODEL_CONFIGS[selectedModel].title}: {MODEL_CONFIGS[selectedModel].subtitle}</p>
                                 </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {MODEL_CONFIGS[selectedModel].fields.map((field) => {
+                                        if (field.type === 'number') {
+                                            return (
+                                                <Input
+                                                    key={field.key}
+                                                    label={field.label}
+                                                    type="number"
+                                                    placeholder={field.placeholder}
+                                                    value={formData[field.key]}
+                                                    onChange={handleChange(field.key, 'number')}
+                                                />
+                                            );
+                                        }
+
+                                        return (
+                                            <div key={field.key}>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+                                                <select
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    value={String(formData[field.key])}
+                                                    onChange={handleChange(field.key, 'select')}
+                                                >
+                                                    {(field.options || []).map((option) => (
+                                                        <option key={`${field.key}-${option.value}`} value={option.value}>{option.label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {errorMessage && (
+                                    <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                                        {errorMessage}
+                                    </div>
+                                )}
 
                                 <Button onClick={calculateRisk} disabled={isSaving} className="w-full mt-6 flex justify-center items-center gap-2">
                                     <Save size={18} />
-                                    {isSaving ? 'Processing Model...' : 'Save & Calculate Risk'}
+                                    {isSaving ? 'Running ML Prediction...' : 'Save & Calculate Risk'}
                                 </Button>
                             </CardContent>
                         </Card>
@@ -281,28 +640,32 @@ export function Prediction() {
                                         <div className={`inline-flex p-4 rounded-full mb-4 ${getRiskColor(result.level)}`}>
                                             {getRiskIcon(result.level)}
                                         </div>
-                                        <div className="text-6xl font-bold mb-2" style={{ color: result.level === 'low' ? '#10b981' : '#ef4444' }}>
-                                            {result.percentage}%
+                                        <div className="text-6xl font-bold mb-2" style={{ color: result.level === 'low' ? '#10b981' : result.level === 'moderate' ? '#d97706' : '#ef4444' }}>
+                                            {result.percentage.toFixed(1)}%
                                         </div>
-                                        <div className="text-xl font-semibold mb-4 uppercase" style={{ color: result.level === 'low' ? '#10b981' : '#ef4444' }}>
+                                        <div className="text-xl font-semibold mb-4 uppercase" style={{ color: result.level === 'low' ? '#10b981' : result.level === 'moderate' ? '#d97706' : '#ef4444' }}>
                                             {result.level} Risk
                                         </div>
                                     </div>
 
                                     <div className="bg-white rounded-xl p-6">
-                                        <h4 className="font-semibold text-gray-800 mb-3">Model Analysis</h4>
+                                        <h4 className="font-semibold text-gray-800 mb-3">Model Analysis ({result.modelLabel})</h4>
+                                        <p className="text-sm text-gray-700 mb-2">
+                                            Predicted Class: <span className="font-semibold">{result.prediction === 1 ? 'At Risk' : 'Lower Risk'}</span>
+                                        </p>
+                                        <p className="text-sm text-gray-700 mb-4">
+                                            Model Confidence (Accuracy Signal): <span className="font-semibold">{result.confidence.toFixed(1)}%</span>
+                                        </p>
                                         <p className="text-gray-700 leading-relaxed mb-4">
                                             {result.explanation}
                                         </p>
                                         <div className="space-y-2">
-                                            <h5 className="font-semibold text-gray-800">Key Focus Areas:</h5>
+                                            <h5 className="font-semibold text-gray-800">Recommendations:</h5>
                                             <ul className="list-disc list-inside text-gray-700 space-y-1 text-sm">
-                                                {formData.exercise_angina === 1 && <li className="text-red-600 font-medium">Exercise-induced Angina detected</li>}
-                                                {formData.resting_bp > 140 && <li className="text-red-600 font-medium">Resting Blood Pressure elevated ({formData.resting_bp} mmHg)</li>}
-                                                {formData.cholesterol > 240 && <li className="text-red-600 font-medium">High Cholesterol detected ({formData.cholesterol} mg/dL)</li>}
-                                                {formData.bmi > 30 && <li className="text-yellow-600">BMI indicates clinical obesity</li>}
-                                                {formData.fasting_blood_sugar === 1 && <li className="text-yellow-600">Elevated Fasting Blood Sugar &gt; 120</li>}
-                                                <li className="text-gray-600">Maintain a balanced diet and exercise routine</li>
+                                                {result.level === 'high' && <li className="text-red-600 font-medium">Schedule a medical consultation promptly for detailed evaluation.</li>}
+                                                {result.level === 'moderate' && <li className="text-amber-700 font-medium">Review modifiable risk factors and repeat evaluation after changes.</li>}
+                                                {result.level === 'low' && <li className="text-green-700 font-medium">Continue preventive care and periodic health monitoring.</li>}
+                                                <li className="text-gray-600">AI predictions support but do not replace clinical diagnosis.</li>
                                             </ul>
                                         </div>
                                     </div>
@@ -315,7 +678,7 @@ export function Prediction() {
                                 <div className="text-center p-8">
                                     <Activity className="text-gray-300 mx-auto mb-4" size={64} />
                                     <p className="text-gray-500">
-                                        Review your parameters and click calculate. The model determines strict Risk based solely on (Age &gt; 50 + BP &gt; 140 + Chol &gt; 240) OR Exercised Angina.
+                                        Select a disease model, verify your health metrics, and click calculate to generate an ML prediction.
                                     </p>
                                 </div>
                             </Card>
