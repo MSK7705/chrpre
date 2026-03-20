@@ -284,6 +284,44 @@ def encode_categorical_features(features: Dict[str, Any], model_type: str) -> Di
     
     return encoded_features
 
+def coerce_for_encoder(col_name: str, encoder, series: pd.Series) -> pd.Series:
+    classes = list(getattr(encoder, "classes_", []))
+    if not classes:
+        return series
+    # Numeric classes 0/1
+    if all(isinstance(c, (int, np.integer)) for c in classes):
+        def _map_val(v):
+            if isinstance(v, str):
+                lv = v.strip().lower()
+                if lv in ["male", "m", "yes", "true", "1"]:
+                    return 1
+                if lv in ["female", "f", "no", "false", "0"]:
+                    return 0
+                try:
+                    return int(v)
+                except Exception:
+                    return v
+            if isinstance(v, bool):
+                return 1 if v else 0
+            return v
+        return series.apply(_map_val)
+    # String classes like 'Male'/'Female' or 'True'/'False'
+    if all(isinstance(c, str) for c in classes):
+        def _map_val(v):
+            if isinstance(v, bool):
+                return "True" if v else "False"
+            if isinstance(v, (int, np.integer)):
+                return classes[1] if int(v) == 1 else classes[0]
+            if isinstance(v, str):
+                lv = v.strip().lower()
+                if lv in ["male", "m", "yes", "true", "1"]:
+                    return classes[1] if len(classes) > 1 else classes[0]
+                if lv in ["female", "f", "no", "false", "0"]:
+                    return classes[0]
+            return v
+        return series.apply(_map_val)
+    return series
+
 def make_prediction(model_type: str, features: Dict[str, Any]):
     """Generic prediction function for all models"""
     artifacts = load_model_artifacts(model_type)
@@ -299,46 +337,12 @@ def make_prediction(model_type: str, features: Dict[str, Any]):
             # Heart disease specific processing - handle encoders properly
             df = pd.DataFrame([encoded_features])
             
-            # Helper: coerce values to match encoder classes
-            def _coerce_for_encoder(col_name: str, encoder, series: pd.Series) -> pd.Series:
-                classes = list(getattr(encoder, "classes_", []))
-                if not classes:
-                    return series
-                # Numeric classes 0/1
-                if all(isinstance(c, (int, np.integer)) for c in classes):
-                    def _map_val(v):
-                        if isinstance(v, str):
-                            lv = v.strip().lower()
-                            if lv in ["male", "m", "yes", "true", "1"]:
-                                return 1
-                            if lv in ["female", "f", "no", "false", "0"]:
-                                return 0
-                            # try int cast
-                            try:
-                                return int(v)
-                            except Exception:
-                                return v
-                        if isinstance(v, bool):
-                            return 1 if v else 0
-                        return v
-                    return series.apply(_map_val)
-                # String classes like 'Male'/'Female' or 'True'/'False'
-                if all(isinstance(c, str) for c in classes):
-                    def _map_val(v):
-                        if isinstance(v, bool):
-                            return "True" if v else "False"
-                        if isinstance(v, (int, np.integer)):
-                            return classes[1] if int(v) == 1 else classes[0]
-                        return v
-                    return series.apply(_map_val)
-                return series
-            
             # Impute and encode
             if "encoders" in artifacts and "categorical_cols" in config:
                 for col in config["categorical_cols"]:
                     if col in df.columns:
                         try:
-                            coerced = _coerce_for_encoder(col, artifacts["encoders"][col], df[col])
+                            coerced = coerce_for_encoder(col, artifacts["encoders"][col], df[col])
                             df[col] = artifacts["encoders"][col].transform(coerced)
                         except ValueError as e:
                             if "previously unseen labels" in str(e):
@@ -398,7 +402,8 @@ def make_prediction(model_type: str, features: Dict[str, Any]):
                 for col, encoder in artifacts["encoders"].items():
                     if col in df.columns:
                         try:
-                            df[col] = encoder.transform(df[col])
+                            coerced = coerce_for_encoder(col, encoder, df[col])
+                            df[col] = encoder.transform(coerced)
                         except ValueError as e:
                             if "previously unseen labels" in str(e):
                                 # Handle unseen labels by using the most frequent class
