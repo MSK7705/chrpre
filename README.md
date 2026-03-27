@@ -1,6 +1,6 @@
 # chrpre
 
-This repository, `chrpre`, houses a collection of Machine Learning models specifically developed for the prediction and analysis of various chronic diseases. It provides modular solutions for risk assessment, leveraging Python-based ML frameworks and tools.
+This repository, `Chronic_Prediction`, houses a collection of Machine Learning models specifically developed for the prediction and analysis of various chronic diseases. It provides modular solutions for risk assessment, leveraging Python-based ML frameworks and tools.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ This repository, `chrpre`, houses a collection of Machine Learning models specif
 
 ## Project Title & Description
 
-**chrpre**
+**Chronic_Prediction**
 
 This repository is dedicated to the development and deployment of Machine Learning models for predicting chronic diseases. It currently includes models for Arthritis, Asthma, Chronic Obstructive Pulmonary Disease (COPD), Chronic Kidney Disease (CKD), and Diabetes. The aim is to provide robust predictive tools that can potentially aid in early detection, risk stratification, and patient management.
 
